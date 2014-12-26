@@ -5,6 +5,11 @@ using UnitySuiceCommons.TaskManager;
 
 namespace SuiceExample.Task
 {
+    /// <summary>
+    /// Used to show example of how to use co-routines in Suice.
+    /// 
+    /// @author DisTurBinG
+    /// </summary>
     [Singleton]
     public class TaskExample : IAutoInitialize, ITaskExample
     {
