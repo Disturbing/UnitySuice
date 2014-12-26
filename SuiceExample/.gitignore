@@ -1,0 +1,8 @@
+/Library
+/obj
+/Temp
+/*.csproj
+/*.unityproj
+/*.sln
+/*.user
+/*.suo
