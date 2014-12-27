@@ -13,7 +13,7 @@ namespace SuiceExample.Snowman
     public class SnowmanRandomSpawner : ISnowmanRandomSpawner
     {
         public const float MOVEMENT_TIME_LENGTH_S = 3;
-        public const float DESTROY_DELAY_TIME_LENGTH_S = MOVEMENT_TIME_LENGTH_S + 3;
+        public const float DESTROY_DELAY_TIME_LENGTH_S = MOVEMENT_TIME_LENGTH_S + 5;
 
         public class AlreadyStartedException : Exception { }
 
