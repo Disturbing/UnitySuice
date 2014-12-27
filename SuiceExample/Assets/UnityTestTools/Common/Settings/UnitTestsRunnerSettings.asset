@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Name: UnitTestsRunnerSettings
   m_EditorClassIdentifier: 
   optionsFoldout: 1
-  filtersFoldout: 0
-  runOnRecompilation: 1
+  filtersFoldout: 1
+  runOnRecompilation: 0
   horizontalSplit: 1
   autoSaveSceneBeforeRun: 0
   runTestOnANewScene: 0

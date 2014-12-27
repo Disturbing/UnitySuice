@@ -51,7 +51,11 @@ namespace UnitySuiceCommons.EventDispatcher
 
             foreach (MethodInfo methodInfo in eventListenerInstance.GetType().GetMethods(eventMethodFlags)) {
                 if (Attribute.GetCustomAttribute(methodInfo, typeof (EventListener)) != null) {
-                    registeredEventListener = RegisterMethodToEvent(eventListenerInstance, methodInfo);
+                    if (methodInfo.IsPublic) {
+                        registeredEventListener = RegisterMethodToEvent(eventListenerInstance, methodInfo);
+                    } else {
+                        throw new EventListenerMethodMustBePublic(eventListenerInstance.GetType().FullName, methodInfo.Name);
+                    }
                 }
             }
 

@@ -11,7 +11,7 @@ namespace SuiceExample.Task
     /// @author DisTurBinG
     /// </summary>
     [Singleton]
-    public class TaskExample : IAutoInitialize, ITaskExample
+    public class TaskExample : IInitializable, ITaskExample
     {
         private const string TASK_MANAGER_END_MSG = "Task Manager Example Ends in {0}";
         private const int REPEAT_END_MSG_CNT = 3;

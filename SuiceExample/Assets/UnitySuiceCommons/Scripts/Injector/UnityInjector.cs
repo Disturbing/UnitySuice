@@ -49,7 +49,7 @@ namespace UnitySuiceCommons.Injector
             // Setup Event Listener suice registrations
             SetupEventListener();
 
-            // Start suice with Unity dll
+            // Start suice with Unity dll - Options to start with mutliple assemblies are available
             Injector.Initialize(Assembly.GetExecutingAssembly());
         }
 
