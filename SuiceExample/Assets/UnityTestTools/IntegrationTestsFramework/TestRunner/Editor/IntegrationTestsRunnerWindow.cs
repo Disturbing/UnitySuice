@@ -91,7 +91,7 @@ namespace UnityTest
 
         public void OnEnable()
         {
-            title = "Integration Tests Runner";
+            titleContent.text = "Integration Tests Runner";
             s_Instance = this;
 
             m_Settings = ProjectSettingsBase.Load<IntegrationTestsRunnerSettings>();
