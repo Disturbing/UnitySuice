@@ -1,6 +1,10 @@
 UnitySuice
 ==========
 
+This is the original project from Disturibing, updated to work with Unity 5.2
+
+Following is original readme:
+
 Example project of using Suice Dependency Injection in Unity 4.6+
 
 NOTE: Requires Unity 4.6

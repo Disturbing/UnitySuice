@@ -44,7 +44,7 @@ namespace UnityTest
 
         public UnitTestView()
         {
-            title = "Unit Tests Runner";
+            titleContent.text = "Unit Tests Runner";
             m_ResultList.Clear();
         }
 

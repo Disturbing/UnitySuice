@@ -176,7 +176,7 @@ namespace UnityTest
         {
             minSize = new Vector2(300, 100);
             position = new Rect(position.xMin, position.yMin, 300, 100);
-            title = "Test run monitor";
+            titleContent.text = "Test run monitor";
             Instance = this;
             m_StatusLabel = "Initializing...";
             if (EditorApplication.isCompiling) return;
