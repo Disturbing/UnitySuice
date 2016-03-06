@@ -55,7 +55,7 @@ namespace UnityTest
                         return false;
                     }
 
-                    var bf = new BinaryFormatter();
+                    var bf = new DTOFormatter();
                     bf.Serialize(tcpClient.GetStream(), dto);
                     tcpClient.GetStream().Close();
                     tcpClient.Close();
@@ -97,6 +97,11 @@ namespace UnityTest
         public void TestFinished(TestResult test)
         {
             SendDTO(ResultDTO.CreateTestFinished(test));
+        }
+
+        public void AllScenesFinished()
+        {
+            SendDTO (ResultDTO.CreateAllScenesFinished ());
         }
 
         public void TestRunInterrupted(List<ITestComponent> testsNotRun)

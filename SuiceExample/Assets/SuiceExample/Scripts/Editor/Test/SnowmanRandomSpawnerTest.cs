@@ -9,17 +9,17 @@ namespace SuiceExample.Test
     [TestFixture]
     public class SnowmanRandomSpawnerTest
     {
-        private ISnowmanFactory snowmanFactory;
+        private ISnowmanPoolManager snowmanPoolManager;
         private IUnityTaskManager taskManager;
         private SnowmanRandomSpawner randomSpawner;
 
         [SetUp]
         public void Setup()
         {
-            snowmanFactory = Substitute.For<ISnowmanFactory>();
+            snowmanPoolManager = Substitute.For<ISnowmanPoolManager>();
             taskManager = Substitute.For<IUnityTaskManager>();
 
-            randomSpawner = new SnowmanRandomSpawner(snowmanFactory, taskManager);
+            randomSpawner = new SnowmanRandomSpawner(snowmanPoolManager, taskManager);
         }
 
         [Test]

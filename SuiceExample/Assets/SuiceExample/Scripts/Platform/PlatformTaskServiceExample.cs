@@ -13,7 +13,7 @@ namespace SuiceExample.Platform
     /// 
     /// @author DisTurBinG
     /// </summary>
-    [Singleton]
+    [Singleton(Scope.EAGER_SINGLETON)]
     public class PlatformTaskServiceExample
     {
         private readonly IPlatformExample platformExample;

@@ -77,9 +77,13 @@ namespace UnityTest
 
         protected void OnSelect()
         {
-            if (!Event.current.control) Selection.objects = new Object[0];
+			if (!Event.current.control && !Event.current.command) 
+			{
+				Selection.objects = new Object[0];
+				GUIUtility.keyboardControl = 0;
+			}
 
-            if (Event.current.control && Selection.gameObjects.Contains(test.gameObject))
+			if ((Event.current.control || Event.current.command) && Selection.gameObjects.Contains(test.gameObject))
                 Selection.objects = Selection.gameObjects.Where(o => o != test.gameObject).ToArray();
             else
                 Selection.objects = Selection.gameObjects.Concat(new[] { test.gameObject }).ToArray();
@@ -127,12 +131,7 @@ namespace UnityTest
         {
             foreach (var t in testsToDelete)
             {
-#if UNITY_4_0 || UNITY_4_0_1 || UNITY_4_1 || UNITY_4_2
-                Undo.RegisterSceneUndo("Destroy Tests");
-                GameObject.DestroyImmediate(t);
-#else
                 Undo.DestroyObjectImmediate(t);
-#endif
             }
         }
 

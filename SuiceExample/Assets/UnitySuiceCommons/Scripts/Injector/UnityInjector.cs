@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using CmnEventDispatcher.Util;
+using SuiceExample.Platform;
 using UnitySuiceCommons.EventDispatcher;
 using UnitySuiceCommons.TaskManager;
 using UnityEngine;

@@ -3,6 +3,7 @@ using NUnit.Framework;
 using SuiceExample.Factory;
 using SuiceExample.Snowman;
 using UnityEngine;
+using UnitySuiceCommons.Resource;
 
 namespace SuiceExample.Test
 {
@@ -15,8 +16,9 @@ namespace SuiceExample.Test
     [TestFixture]
     public class SnowmanControllerTest
     {
-        private ISnowmanMoveComponent snowmanMoveComponent = Substitute.For<ISnowmanMoveComponent>();
-        private ISnowmanFactory snowmanFactory = Substitute.For<ISnowmanFactory>();
+        private ISnowmanMoveComponent snowmanMoveComponent;
+        private ISnowmanPoolManager snowmanPoolManager;
+        private IUnityResources unityResources;
 
         private SnowmanController snowmanController;
 
@@ -24,9 +26,10 @@ namespace SuiceExample.Test
         public void Setup()
         {
             snowmanMoveComponent = Substitute.For<ISnowmanMoveComponent>();
-            snowmanFactory = Substitute.For<ISnowmanFactory>();
+            snowmanPoolManager = Substitute.For<ISnowmanPoolManager>();
+            unityResources = Substitute.For<IUnityResources>();
         
-            snowmanController = new SnowmanController(snowmanFactory, snowmanMoveComponent);
+            snowmanController = new SnowmanController(snowmanPoolManager, unityResources);
         }
 
         [Test]
@@ -43,7 +46,7 @@ namespace SuiceExample.Test
             snowmanMoveComponent.IsMoving().Returns(false);
 
             Assert.DoesNotThrow(() => snowmanController.Destroy());
-            snowmanFactory.Received(1).ReturnToPool(snowmanController);
+            snowmanPoolManager.Received(1).ReturnToPool(snowmanController);
         }
 
         [Test]

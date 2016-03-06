@@ -11,7 +11,7 @@ namespace SuiceExample.Snowman
     /// 
     /// @author DisTurBinG
     /// </summary>
-    [Singleton]
+    [Singleton(Scope.EAGER_SINGLETON)]
     public class InitialSnowmanSpawner : IDoubleSnowmanSpawner
     {
         public const float SNOWMAN_MOVE_TIME_LENGTH = 5;

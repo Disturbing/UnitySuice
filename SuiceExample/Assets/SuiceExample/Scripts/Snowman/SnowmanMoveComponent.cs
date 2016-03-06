@@ -1,6 +1,4 @@
-﻿using System;
-using SuiceExample.Snowman;
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace SuiceExample.Factory
 {

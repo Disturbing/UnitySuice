@@ -10,7 +10,7 @@ namespace SuiceExample.Task
     /// 
     /// @author DisTurBinG
     /// </summary>
-    [Singleton]
+    [Singleton(Scope.EAGER_SINGLETON)]
     public class TaskExample : IInitializable, ITaskExample
     {
         private const string TASK_MANAGER_END_MSG = "Task Manager Example Ends in {0}";

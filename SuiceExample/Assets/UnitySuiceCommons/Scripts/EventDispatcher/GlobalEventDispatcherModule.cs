@@ -1,5 +1,4 @@
-﻿
-using DTools.Suice;
+﻿using DTools.Suice;
 
 namespace UnitySuiceCommons.EventDispatcher
 {
@@ -12,7 +11,7 @@ namespace UnitySuiceCommons.EventDispatcher
     {
         internal readonly GlobalEventDispatcher GlobalEventDispatcher = new GlobalEventDispatcher();
 
-        public override void Configure()
+        protected override void Configure()
         {
             Bind<IGlobalEventDispatcher>().ToInstance(GlobalEventDispatcher);
         }

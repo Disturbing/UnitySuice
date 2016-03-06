@@ -1,7 +1,9 @@
-﻿using Mono.CompilerServices.SymbolWriter;
+﻿using DTools.Suice;
+using Mono.CompilerServices.SymbolWriter;
 using NSubstitute;
 using NUnit.Framework;
 using SuiceExample.Factory;
+using SuiceExample.Snowman;
 using UnityEngine;
 using UnitySuiceCommons.Resource;
 
@@ -17,10 +19,11 @@ namespace SuiceExample.Test
     public class SnowmanFactoryExampleTest
     {
         private IUnityResources unityResources;
-        private SnowmanFactory snowmanFactory;
+        private SnowmanPoolManager snowmanPoolManager;
         private GameObject prefabTemplate;
         private GameObject poolContainer;
-
+        private IProvider<ISnowmanController> snowmanControllerProvider;
+        
         [SetUp]
         public void Setup()
         {
@@ -29,14 +32,14 @@ namespace SuiceExample.Test
             poolContainer = new GameObject();
 
             unityResources = Substitute.For<IUnityResources>();
-            unityResources.CreateEmptyGameObject(SnowmanFactory.SNOWMAN_POOL_CONTAINER_NAME).Returns(poolContainer);
-            unityResources.Load(SnowmanFactory.SNOWMAN_ASSET_PATH, typeof (GameObject)).Returns(prefabTemplate);
+            snowmanControllerProvider = Substitute.For<IProvider<ISnowmanController>>();
+
+            unityResources.CreateEmptyGameObject(SnowmanPoolManager.SNOWMAN_POOL_CONTAINER_NAME).Returns(poolContainer);
+            unityResources.Load(SnowmanController.SNOWMAN_ASSET_PATH, typeof(GameObject)).Returns(prefabTemplate);
             unityResources.Instantiate(prefabTemplate).Returns(prefabTemplate);
-
-
-            //TODO: End Remove
-
-            snowmanFactory = new SnowmanFactory(unityResources);
+            snowmanControllerProvider.Provide().Returns(Substitute.For<ISnowmanController>());
+            
+            snowmanPoolManager = new SnowmanPoolManager(unityResources, snowmanControllerProvider);
         }
 
         [TearDown]
@@ -49,37 +52,37 @@ namespace SuiceExample.Test
         [Test]
         public void TestInit()
         {
-            snowmanFactory.Initialize();
+            snowmanPoolManager.Initialize();
 
-            unityResources.Received(1).CreateEmptyGameObject(SnowmanFactory.SNOWMAN_POOL_CONTAINER_NAME);
-            unityResources.Received(SnowmanFactory.INITIAL_POOL_COUNT).Instantiate(Arg.Any<GameObject>());
+            unityResources.Received(1).CreateEmptyGameObject(SnowmanPoolManager.SNOWMAN_POOL_CONTAINER_NAME);
+            snowmanControllerProvider.Received(SnowmanPoolManager.INITIAL_POOL_COUNT).Provide();
         }
 
         [Test]
         public void TestPooledProvide()
         {
-            snowmanFactory.Initialize();
+            snowmanPoolManager.Initialize();
 
-            for (int i = 0; i < SnowmanFactory.INITIAL_POOL_COUNT; i++) {
-                snowmanFactory.Provide();
+            for (int i = 0; i < SnowmanPoolManager.INITIAL_POOL_COUNT; i++) {
+                snowmanPoolManager.Provide();
             }
 
-            unityResources.Received(SnowmanFactory.INITIAL_POOL_COUNT).Instantiate(Arg.Any<GameObject>());
+            snowmanControllerProvider.Received(SnowmanPoolManager.INITIAL_POOL_COUNT).Provide();
         }
 
         [Test]
         public void TestMoreThanInitialPoolProvide()
         {
-            int snowmenToCreate = SnowmanFactory.INITIAL_POOL_COUNT + 5;
-            snowmanFactory.Initialize();
+            int snowmenToCreate = SnowmanPoolManager.INITIAL_POOL_COUNT + 5;
+            snowmanPoolManager.Initialize();
 
-            unityResources.Received(SnowmanFactory.INITIAL_POOL_COUNT).Instantiate(Arg.Any<GameObject>());
+            snowmanControllerProvider.Received(SnowmanPoolManager.INITIAL_POOL_COUNT).Provide();
 
             for (int i = 0; i < snowmenToCreate; i++) {
-                snowmanFactory.Provide();
+                snowmanPoolManager.Provide();
             }
 
-            unityResources.Received(snowmenToCreate).Instantiate(Arg.Any<GameObject>());
+            snowmanControllerProvider.Received(snowmenToCreate).Provide();
         }
     }
 }

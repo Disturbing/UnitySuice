@@ -10,7 +10,7 @@ namespace UnitySuiceCommons.UnityEvent
     /// 
     /// @author DisTurBinG
     /// </summary>
-    [Singleton]
+    [Singleton(Scope.EAGER_SINGLETON)]
     public class UnityEventExample : IUnityEventExample
     {
         [EventListener]

@@ -21,6 +21,7 @@ namespace UnityTest
 
         public static void RunUnitTests()
         {
+            PlayerSettings.useMacAppStoreValidation = false;
             var filter = GetTestFilter();
             var resultFilePath = GetParameterArgument(k_ResultFilePathParam) ?? Directory.GetCurrentDirectory();
             if (Directory.Exists(resultFilePath))
@@ -116,6 +117,10 @@ namespace UnityTest
             {
                 EditorApplication.Exit(returnCodeRunError);
                 throw exception;
+            }
+
+            public void AllScenesFinished()
+            {
             }
         }
     }

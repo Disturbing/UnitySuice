@@ -17,7 +17,7 @@ namespace UnitySuiceCommons.TaskManager
             this.unityTaskManagerObject = unityTaskManagerObject;
         }
 
-        public override void Configure()
+        protected override void Configure()
         {
             Bind<IUnityTaskManager>().ToInstance(unityTaskManagerObject.AddComponent<UnityTaskManager>());
         }

@@ -23,7 +23,7 @@ namespace UnitySuiceCommons.Resource
             return GameObject.CreatePrimitive(primitiveType);
         }
 
-        public Object Instantiate(GameObject original)
+        public Object Instantiate(Object original)
         {
             return Object.Instantiate(original);
         }

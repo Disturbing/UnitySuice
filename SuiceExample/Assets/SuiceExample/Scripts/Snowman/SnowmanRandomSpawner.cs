@@ -17,15 +17,15 @@ namespace SuiceExample.Snowman
 
         public class AlreadyStartedException : Exception { }
 
-        private readonly ISnowmanFactory snowmanFactory;
+        private readonly ISnowmanPoolManager snowmanPoolManager;
         private readonly IUnityTaskManager taskManager;
 
         private bool hasStarted = false;
 
         [Inject]
-        public SnowmanRandomSpawner(ISnowmanFactory snowmanFactory, IUnityTaskManager taskManager)
+        public SnowmanRandomSpawner(ISnowmanPoolManager snowmanPoolManager, IUnityTaskManager taskManager)
         {
-            this.snowmanFactory = snowmanFactory;
+            this.snowmanPoolManager = snowmanPoolManager;
             this.taskManager = taskManager;
         }
 
@@ -41,7 +41,7 @@ namespace SuiceExample.Snowman
 
         private bool SpawnSnowmanLoop()
         {
-            ISnowmanController snowmanController = snowmanFactory.Provide();
+            ISnowmanController snowmanController = snowmanPoolManager.Provide();
             snowmanController.MoveToRandomPosition(MOVEMENT_TIME_LENGTH_S);
             taskManager.AddTask(snowmanController.Destroy, TimeSpan.FromSeconds(DESTROY_DELAY_TIME_LENGTH_S).TotalMilliseconds);
 

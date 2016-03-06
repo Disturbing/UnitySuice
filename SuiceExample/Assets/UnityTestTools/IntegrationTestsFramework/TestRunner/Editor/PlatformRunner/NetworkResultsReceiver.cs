@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.Serialization.Formatters.Binary;
 using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
@@ -14,7 +13,7 @@ namespace UnityTest
     [Serializable]
     public class NetworkResultsReceiver : EditorWindow
     {
-        public static NetworkResultsReceiver Instance = null;
+        public static NetworkResultsReceiver Instance;
 
         private string m_StatusLabel;
         private TcpListener m_Listener;
@@ -46,7 +45,7 @@ namespace UnityTest
                 m_LastMessageReceived = DateTime.Now;
                 using (var stream = client.GetStream())
                 {
-                    var bf = new BinaryFormatter();
+                    var bf = new DTOFormatter();
                     dto = (ResultDTO)bf.Deserialize(stream);
                     stream.Close();
                 }
@@ -88,6 +87,10 @@ namespace UnityTest
                         var resultWriter = new XmlResultWriter(dto.loadedLevelName, platform, m_TestResults.ToArray());
                         try
                         {
+                            if (!Directory.Exists(m_Configuration.resultsDir))
+                            {
+                                Directory.CreateDirectory(m_Configuration.resultsDir);
+                            }
                             var filePath = Path.Combine(m_Configuration.resultsDir, dto.loadedLevelName + ".xml");
                             File.WriteAllText(filePath, resultWriter.GetTestResult());
                         }
@@ -96,13 +99,12 @@ namespace UnityTest
                             Debug.LogException(e);
                         }
                     }
-                    if (dto.levelCount - dto.loadedLevel == 1)
-                    {
-                        m_Running = false;
-                        m_RunFinished = true;
-                    }
                     break;
-                case ResultDTO.MessageType.Ping:
+            case ResultDTO.MessageType.AllScenesFinished:
+                m_Running = false;
+                m_RunFinished = true;
+                break;
+            case ResultDTO.MessageType.Ping:
                     break;
             }
         }
@@ -175,8 +177,7 @@ namespace UnityTest
         public void OnEnable()
         {
             minSize = new Vector2(300, 100);
-            position = new Rect(position.xMin, position.yMin, 300, 100);
-            titleContent.text = "Test run monitor";
+            titleContent = new GUIContent("Test run monitor");
             Instance = this;
             m_StatusLabel = "Initializing...";
             if (EditorApplication.isCompiling) return;
@@ -185,17 +186,17 @@ namespace UnityTest
 
         private void EnableServer()
         {
+            if (m_Configuration == null) throw new Exception("No result receiver server configuration.");
+
             var ipAddress = IPAddress.Any;
-            if (m_Configuration != null && m_Configuration.ipList != null && m_Configuration.ipList.Count == 1)
+            if (m_Configuration.ipList != null && m_Configuration.ipList.Count == 1)
                 ipAddress = IPAddress.Parse(m_Configuration.ipList.Single());
 
             var ipAddStr = Equals(ipAddress, IPAddress.Any) ? "[All interfaces]" : ipAddress.ToString();
-            if (m_Configuration != null)
-            {
-                m_Listener = new TcpListener(ipAddress, m_Configuration.port);
-                m_StatusLabel = "Waiting for connection on: " + ipAddStr + ":" + m_Configuration.port;
-            }
-
+            
+            m_Listener = new TcpListener(ipAddress, m_Configuration.port);
+            m_StatusLabel = "Waiting for connection on: " + ipAddStr + ":" + m_Configuration.port;
+            
             try
             {
                 m_Listener.Start(100);
@@ -234,6 +235,10 @@ namespace UnityTest
         {
             var w = (NetworkResultsReceiver)GetWindow(typeof(NetworkResultsReceiver), false);
             w.SetConfiguration(configuration);
+            if (!EditorApplication.isCompiling)
+            {
+                w.EnableServer();
+            }
             w.Show(true);
         }
 
@@ -245,7 +250,12 @@ namespace UnityTest
         public static void StopReceiver()
         {
             if (Instance == null) return;
-            Instance.Close();
+			try{
+            	Instance.Close();
+			}catch(Exception e){
+				Debug.LogException(e);
+				DestroyImmediate(Instance);
+			}
         }
     }
 }

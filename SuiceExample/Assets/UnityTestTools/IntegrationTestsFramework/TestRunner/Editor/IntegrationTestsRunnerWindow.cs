@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
 using UnityTest.IntegrationTestRunner;
@@ -8,27 +10,19 @@ using UnityTest.IntegrationTestRunner;
 namespace UnityTest
 {
     [Serializable]
-    public class IntegrationTestsRunnerWindow : EditorWindow
+    public class IntegrationTestsRunnerWindow : EditorWindow, IHasCustomMenu
     {
         #region GUI Contents
-        private readonly GUIContent m_GUIOptionsHideLabel = new GUIContent("Hide", Icons.GearImg);
-        private readonly GUIContent m_GUIOptionsShowLabel = new GUIContent("Options", Icons.GearImg);
-        private readonly GUIContent m_GUICreateNewTest = new GUIContent(Icons.PlusImg, "Create new test");
-        private readonly GUIContent m_GUIRunSelectedTests = new GUIContent(Icons.RunImg, "Run selected test(s)");
-        private readonly GUIContent m_GUIRunAllTests = new GUIContent(Icons.RunAllImg, "Run all tests");
-        private readonly GUIContent m_GUIAdvancedFilterShow = new GUIContent("Advanced");
-        private readonly GUIContent m_GUIAdvancedFilterHide = new GUIContent("Hide");
-        private readonly GUIContent m_GUIAddGoUderTest = new GUIContent("Add GOs under test", "Add new GameObject under selected test");
+        private readonly GUIContent m_GUICreateNewTest = new GUIContent("Create", "Create new test");
+        private readonly GUIContent m_GUIRunSelectedTests = new GUIContent("Run Selected", "Run selected test(s)");
+        private readonly GUIContent m_GUIRunAllTests = new GUIContent("Run All", "Run all tests");
         private readonly GUIContent m_GUIBlockUI = new GUIContent("Block UI when running", "Block UI when running tests");
-        private readonly GUIContent m_GUIShowSucceededTests = new GUIContent("Succeeded", Icons.SuccessImg, "Show tests that succeeded");
-        private readonly GUIContent m_GUIShowFailedTests = new GUIContent("Failed", Icons.FailImg, "Show tests that failed");
-        private readonly GUIContent m_GUIShowIgnoredTests = new GUIContent("Ignored", Icons.IgnoreImg, "Show tests that are ignored");
-        private readonly GUIContent m_GUIShowNotRunTests = new GUIContent("Not Run", Icons.UnknownImg, "Show tests that didn't run");
+        private readonly GUIContent m_GUIPauseOnFailure = new GUIContent("Pause on test failure");
         #endregion
 
         #region runner steerign vars
         private static IntegrationTestsRunnerWindow s_Instance;
-        [SerializeField] private List<TestComponent> m_TestsToRun;
+        [SerializeField] private List<GameObject> m_TestsToRun;
         [SerializeField] private List<string> m_DynamicTestsToRun;
         [SerializeField] private bool m_ReadyToRun;
         private bool m_IsBuilding;
@@ -37,6 +31,12 @@ namespace UnityTest
         private Vector2 m_TestInfoScroll, m_TestListScroll;
         private IntegrationTestRendererBase[] m_TestLines;
         private string m_CurrectSceneName;
+        private TestFilterSettings m_FilterSettings;
+        
+        Vector2 m_resultTextSize;
+        string m_resultText;
+        GameObject m_lastSelectedGO;
+        int m_resultTestMaxLength = 15000;
 
         [SerializeField] private GameObject m_SelectedLine;
         [SerializeField] private List<TestResult> m_ResultList = new List<TestResult>();
@@ -66,7 +66,7 @@ namespace UnityTest
 
         private static void OnPlaymodeStateChanged()
         {
-            if (EditorApplication.isPlaying  == EditorApplication.isPlayingOrWillChangePlaymode)
+            if (s_Instance && EditorApplication.isPlaying  == EditorApplication.isPlayingOrWillChangePlaymode)
                 s_Instance.RebuildTestList();
         }
 
@@ -82,19 +82,22 @@ namespace UnityTest
 
         private static void BackgroundSceneChangeWatch()
         {
+            if (!s_Instance) return;
             if (s_Instance.m_CurrectSceneName != null && s_Instance.m_CurrectSceneName == EditorApplication.currentScene) return;
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             TestComponent.DestroyAllDynamicTests();
             s_Instance.m_CurrectSceneName = EditorApplication.currentScene;
+            s_Instance.m_ResultList.Clear();
             s_Instance.RebuildTestList();
         }
 
         public void OnEnable()
         {
-            titleContent.text = "Integration Tests Runner";
+            titleContent = new GUIContent("Integration Tests");
             s_Instance = this;
 
             m_Settings = ProjectSettingsBase.Load<IntegrationTestsRunnerSettings>();
+            m_FilterSettings = new TestFilterSettings("UnityTest.IntegrationTestsRunnerWindow");
 
             InitBackgroundRunners();
             if (!EditorApplication.isPlayingOrWillChangePlaymode && !m_ReadyToRun) RebuildTestList();
@@ -128,23 +131,10 @@ namespace UnityTest
 
         public static void OnHierarchyChangeUpdate()
         {
-            if (s_Instance.m_TestLines == null || EditorApplication.isPlayingOrWillChangePlaymode) return;
+            if (!s_Instance || s_Instance.m_TestLines == null || EditorApplication.isPlayingOrWillChangePlaymode) return;
 
             // create a test runner if it doesn't exist
             TestRunner.GetTestRunner();
-
-            if (s_Instance.m_Settings.addNewGameObjectUnderSelectedTest
-                && s_Instance.m_SelectedLine != null
-                && Selection.activeGameObject != null)
-            {
-                var go = Selection.activeGameObject;
-                if (go.transform.parent == null
-                    && go.GetComponent<TestComponent>() == null
-                    && go.GetComponent<TestRunner>() == null)
-                {
-                    go.transform.parent = s_Instance.m_SelectedLine.transform;
-                }
-            }
 
             // make tests are not places under a go that is not a test itself
             foreach (var test in TestComponent.FindAllTestsOnScene())
@@ -158,6 +148,12 @@ namespace UnityTest
             if (selectedInHierarchy) selectedInHierarchy = false;
             else s_Instance.RebuildTestList();
         }
+        
+        public static TestResult GetResultForTest(TestComponent tc)
+        {
+            if(!s_Instance) return new TestResult(tc);
+            return s_Instance.m_ResultList.FirstOrDefault(r => r.GameObject == tc.gameObject);
+        }
 
         public static void OnHierarchyWindowItemDraw(int id, Rect rect)
         {
@@ -165,26 +161,6 @@ namespace UnityTest
             if (o is GameObject)
             {
                 var go = o as GameObject;
-                var tc = go.GetComponent<TestComponent>();
-                if (tc != null)
-                {
-                    if (!EditorApplication.isPlayingOrWillChangePlaymode
-                        && rect.Contains(Event.current.mousePosition)
-                        && Event.current.type == EventType.MouseDown
-                        && Event.current.button == 1)
-                    {
-                        IntegrationTestRendererBase.DrawContextMenu(tc);
-                    }
-
-                    EditorGUIUtility.SetIconSize(new Vector2(15, 15));
-                    var result = s_Instance.m_ResultList.Find(r => r.GameObject == go);
-                    if (result != null)
-                    {
-                        var icon = result.Executed ? IntegrationTestRendererBase.GetIconForResult(result.resultType) : Icons.UnknownImg;
-                        EditorGUI.LabelField(new Rect(rect.xMax - 18, rect.yMin - 2, rect.width, rect.height), new GUIContent(icon));
-                    }
-                    EditorGUIUtility.SetIconSize(Vector2.zero);
-                }
 
                 if (Event.current.type == EventType.MouseDown
                     && Event.current.button == 0
@@ -204,7 +180,9 @@ namespace UnityTest
 
         private static void SelectInHierarchy(GameObject gameObject)
         {
-            if (gameObject == s_Instance.m_SelectedLine) return;
+            if (!s_Instance) return;
+            if (gameObject == s_Instance.m_SelectedLine && gameObject.activeInHierarchy) return;
+            if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             if (!gameObject.activeSelf)
             {
                 selectedInHierarchy = true;
@@ -212,7 +190,7 @@ namespace UnityTest
             }
 
             var tests = TestComponent.FindAllTestsOnScene();
-            var skipList = gameObject.GetComponentsInChildren(typeof(TestComponent), true);
+            var skipList = gameObject.GetComponentsInChildren(typeof(TestComponent), true).ToList();
             tests.RemoveAll(skipList.Contains);
             foreach (var test in tests)
             {
@@ -227,17 +205,17 @@ namespace UnityTest
                 return;
             FocusWindowIfItsOpen(GetType());
 
-            m_TestsToRun = tests.Where(t => t is TestComponent).Cast<TestComponent>().ToList();
-            var temp = m_TestsToRun.Where(t => t.dynamic).ToArray();
-            m_DynamicTestsToRun = temp.Select(c => c.dynamicTypeName).ToList();
-            m_TestsToRun.RemoveAll(temp.Contains);
+            var testComponents = tests.Where(t => t is TestComponent).Cast<TestComponent>().ToList();
+            var dynaminTests = testComponents.Where(t => t.dynamic).ToList();
+            m_DynamicTestsToRun = dynaminTests.Select(c => c.dynamicTypeName).ToList();
+            testComponents.RemoveAll(dynaminTests.Contains);
+
+            m_TestsToRun = testComponents.Select( tc => tc.gameObject ).ToList();
 
             m_ReadyToRun = true;
             TestComponent.DisableAllTests();
-            EditorApplication.isPlaying = true;
 
-            if (m_Settings.blockUIWhenRunning)
-                EditorUtility.DisplayProgressBar("Integration Test Runner", "Initializing", 0);
+            EditorApplication.isPlaying = true;
         }
 
         public void Update()
@@ -247,14 +225,16 @@ namespace UnityTest
                 m_ReadyToRun = false;
                 var testRunner = TestRunner.GetTestRunner();
                 testRunner.TestRunnerCallback.Add(new RunnerCallback(this));
-                testRunner.InitRunner(m_TestsToRun.ToList(), m_DynamicTestsToRun);
+                var testComponents = m_TestsToRun.Select(go => go.GetComponent<TestComponent>()).ToList();
+                testRunner.InitRunner(testComponents, m_DynamicTestsToRun);
             }
         }
-
+        
         private void RebuildTestList()
         {
             m_TestLines = null;
-            if (!TestComponent.AnyTestsOnScene()) return;
+            if (!TestComponent.AnyTestsOnScene() 
+                && !TestComponent.AnyDynamicTestForCurrentScene()) return;
 
             if (!EditorApplication.isPlayingOrWillChangePlaymode)
             {
@@ -301,6 +281,8 @@ namespace UnityTest
             IntegrationTestRendererBase.RunTest = RunTests;
             IntegrationTestGroupLine.FoldMarkers = m_FoldMarkers;
             IntegrationTestLine.Results = m_ResultList;
+            
+            m_FilterSettings.UpdateCounters(m_ResultList.Cast<ITestResult>());
 
             m_FoldMarkers.RemoveAll(o => o == null);
 
@@ -334,7 +316,6 @@ namespace UnityTest
 
         public void OnGUI()
         {
-#if !UNITY_4_0 && !UNITY_4_0_1 && !UNITY_4_1 && !UNITY_4_2
             if (BuildPipeline.isBuildingPlayer)
             {
                 m_IsBuilding = true;
@@ -344,7 +325,7 @@ namespace UnityTest
                 m_IsBuilding = false;
                 Repaint();
             }
-#endif  // if !UNITY_4_0 && !UNITY_4_0_1 && !UNITY_4_1 && !UNITY_4_2
+
             PrintHeadPanel();
 
             EditorGUILayout.BeginVertical(Styles.testList);
@@ -361,21 +342,19 @@ namespace UnityTest
 
         public void PrintHeadPanel()
         {
-            GUILayout.Space(10);
-            EditorGUILayout.BeginHorizontal();
-            var layoutOptions = new[] { GUILayout.Height(24), GUILayout.Width(32) };
-            if (GUILayout.Button(m_GUIRunAllTests, Styles.buttonLeft, layoutOptions)
-                && !EditorApplication.isPlayingOrWillChangePlaymode)
+            EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+            EditorGUI.BeginDisabledGroup(EditorApplication.isPlayingOrWillChangePlaymode);
+            if (GUILayout.Button(m_GUIRunAllTests, EditorStyles.toolbarButton))
             {
                 RunTests(TestComponent.FindAllTestsOnScene().Cast<ITestComponent>().ToList());
             }
-            if (GUILayout.Button(m_GUIRunSelectedTests, Styles.buttonMid, layoutOptions)
-                && !EditorApplication.isPlayingOrWillChangePlaymode)
+            EditorGUI.BeginDisabledGroup(!Selection.gameObjects.Any (t => t.GetComponent(typeof(ITestComponent))));
+            if (GUILayout.Button(m_GUIRunSelectedTests, EditorStyles.toolbarButton))
             {
                 RunTests(Selection.gameObjects.Select(t => t.GetComponent(typeof(TestComponent))).Cast<ITestComponent>().ToList());
             }
-            if (GUILayout.Button(m_GUICreateNewTest, Styles.buttonRight, layoutOptions)
-                && !EditorApplication.isPlayingOrWillChangePlaymode)
+            EditorGUI.EndDisabledGroup();
+            if (GUILayout.Button(m_GUICreateNewTest, EditorStyles.toolbarButton))
             {
                 var test = TestComponent.CreateTest();
                 if (Selection.gameObjects.Length == 1
@@ -387,60 +366,26 @@ namespace UnityTest
                 Selection.activeGameObject = test;
                 RebuildTestList();
             }
-            GUILayout.FlexibleSpace();
-            if (GUILayout.Button(m_Settings.showOptions ? m_GUIOptionsHideLabel : m_GUIOptionsShowLabel, GUILayout.Height(24), GUILayout.Width(80)))
-                m_Settings.showOptions = !m_Settings.showOptions;
-            EditorGUILayout.EndHorizontal();
-
-            if (m_Settings.showOptions)
-                PrintOptions();
-
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("Filter:", GUILayout.Width(35));
-            m_Settings.filterString = EditorGUILayout.TextField(m_Settings.filterString);
-            if (GUILayout.Button(m_Settings.showAdvancedFilter ? m_GUIAdvancedFilterHide : m_GUIAdvancedFilterShow, GUILayout.Width(80), GUILayout.Height(16)))
-                m_Settings.showAdvancedFilter = !m_Settings.showAdvancedFilter;
-            EditorGUILayout.EndHorizontal();
-
-            if (m_Settings.showAdvancedFilter)
-                PrintAdvancedFilter();
+            EditorGUI.EndDisabledGroup();
+            
+            GUILayout.FlexibleSpace ();
+            
+            m_FilterSettings.OnGUI ();
+            
+            EditorGUILayout.EndHorizontal ();
         }
-
-        public void PrintOptions()
+        
+        public void AddItemsToMenu(GenericMenu menu)
         {
-            var style = EditorStyles.toggle;
-            EditorGUILayout.BeginVertical();
-            EditorGUI.BeginChangeCheck();
-
-            m_Settings.addNewGameObjectUnderSelectedTest = EditorGUILayout.Toggle(m_GUIAddGoUderTest, m_Settings.addNewGameObjectUnderSelectedTest, style);
-            m_Settings.blockUIWhenRunning = EditorGUILayout.Toggle(m_GUIBlockUI, m_Settings.blockUIWhenRunning, style);
-            if (EditorGUI.EndChangeCheck()) m_Settings.Save();
-
-            EditorGUILayout.EndVertical();
+            menu.AddItem(m_GUIBlockUI, m_Settings.blockUIWhenRunning, m_Settings.ToggleBlockUIWhenRunning);
+            menu.AddItem(m_GUIPauseOnFailure, m_Settings.pauseOnTestFailure, m_Settings.TogglePauseOnTestFailure);
         }
-
-        private void PrintAdvancedFilter()
-        {
-            EditorGUI.BeginChangeCheck();
-            EditorGUILayout.BeginHorizontal();
-            m_Settings.showSucceededTest = GUILayout.Toggle(m_Settings.showSucceededTest, m_GUIShowSucceededTests, GUI.skin.FindStyle(GUI.skin.button.name + "left"), GUILayout.ExpandWidth(true));
-            m_Settings.showFailedTest = GUILayout.Toggle(m_Settings.showFailedTest, m_GUIShowFailedTests, GUI.skin.FindStyle(GUI.skin.button.name + "mid"));
-            m_Settings.showIgnoredTest = GUILayout.Toggle(m_Settings.showIgnoredTest, m_GUIShowIgnoredTests, GUI.skin.FindStyle(GUI.skin.button.name + "mid"));
-            m_Settings.showNotRunnedTest = GUILayout.Toggle(m_Settings.showNotRunnedTest, m_GUIShowNotRunTests, GUI.skin.FindStyle(GUI.skin.button.name + "right"), GUILayout.ExpandWidth(true));
-            EditorGUILayout.EndHorizontal();
-            if (EditorGUI.EndChangeCheck()) m_Settings.Save();
-        }
-
+        
         private bool PrintTestList(IntegrationTestRendererBase[] renderedLines)
         {
             if (renderedLines == null) return false;
 
-            var filter = new RenderingOptions();
-            filter.showSucceeded = m_Settings.showSucceededTest;
-            filter.showFailed = m_Settings.showFailedTest;
-            filter.showNotRunned = m_Settings.showNotRunnedTest;
-            filter.showIgnored = m_Settings.showIgnoredTest;
-            filter.nameFilter = m_Settings.filterString;
+            var filter = m_FilterSettings.BuildRenderingOptions();
 
             bool repaint = false;
             foreach (var renderedLine in renderedLines)
@@ -482,23 +427,46 @@ namespace UnityTest
 
             m_TestInfoScroll = EditorGUILayout.BeginScrollView(m_TestInfoScroll, GUILayout.MinHeight(m_HorizontalSplitBarPosition));
 
-            var message = "";
-
             if (m_SelectedLine != null)
-                message = GetResultText(m_SelectedLine);
-            EditorGUILayout.TextArea(message, Styles.info);
+                UpdateResultText(m_SelectedLine);
+
+            EditorGUILayout.SelectableLabel(m_resultText, Styles.info, 
+                                            GUILayout.ExpandHeight(true), 
+                                            GUILayout.ExpandWidth(true), 
+                                            GUILayout.MinWidth(m_resultTextSize.x), 
+                                            GUILayout.MinHeight(m_resultTextSize.y));
             EditorGUILayout.EndScrollView();
         }
 
-        private string GetResultText(GameObject go)
+        private void UpdateResultText(GameObject go)
         {
+            if(go == m_lastSelectedGO) return;
+            m_lastSelectedGO = go;
             var result = m_ResultList.Find(r => r.GameObject == go);
-            if (result == null) return "";
-            var messages = result.Name;
-            messages += "\n\n" + result.messages;
+            if (result == null)
+            {
+                m_resultText = string.Empty;
+                m_resultTextSize = Styles.info.CalcSize(new GUIContent(string.Empty));
+                return;
+            }
+            var sb = new StringBuilder(result.Name.Trim());
+            if (!string.IsNullOrEmpty(result.messages))
+            {
+                sb.Append("\n---\n");
+                sb.Append(result.messages.Trim());
+            }
             if (!string.IsNullOrEmpty(result.stacktrace))
-                messages += "\n" + result.stacktrace;
-            return messages.Trim();
+            {
+                sb.Append("\n---\n");
+                sb.Append(result.stacktrace.Trim());
+            }
+            if(sb.Length>m_resultTestMaxLength)
+            {
+                sb.Length = m_resultTestMaxLength;
+                sb.AppendFormat("...\n\n---MESSAGE TRUNCATED AT {0} CHARACTERS---", m_resultTestMaxLength);
+            }
+            m_resultText = sb.ToString().Trim();
+            m_resultTextSize = Styles.info.CalcSize(new GUIContent(m_resultText));
         }
 
         public void OnInspectorUpdate()
@@ -554,6 +522,11 @@ namespace UnityTest
                 PlayerSettings.runInBackground = m_RunInBackground;
             }
 
+            public void AllScenesFinished()
+            {
+
+            }
+
             public void TestStarted(TestResult test)
             {
                 m_Window.SetCurrentTest(test.TestComponent);
@@ -570,6 +543,12 @@ namespace UnityTest
                     result.Update(test);
                 else
                     m_Window.m_ResultList.Add(test);
+                    
+                if(test.IsFailure && m_Window.m_Settings.pauseOnTestFailure)
+                {
+                    EditorUtility.ClearProgressBar();
+                    EditorApplication.isPaused = true;
+                }
             }
 
             public void TestRunInterrupted(List<ITestComponent> testsNotRun)
@@ -580,7 +559,15 @@ namespace UnityTest
 
             private void OnEditorUpdate()
             {
-                if (m_Window.m_Settings.blockUIWhenRunning && m_CurrentTest != null
+                if(!EditorApplication.isPlaying) 
+                {
+                    TestRunInterrupted(null);
+                    return;
+                }
+
+                if (m_Window.m_Settings.blockUIWhenRunning 
+                    && m_CurrentTest != null 
+                    && !EditorApplication.isPaused 
                     && EditorUtility.DisplayCancelableProgressBar("Integration Test Runner",
                                                                   "Running " + m_CurrentTest.Name,
                                                                   (float)m_CurrentTestNumber / m_TestNumber))

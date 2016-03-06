@@ -18,7 +18,7 @@ namespace UnitySuiceCommons.Resource
         //TODO: This is not testable - create GameObjectWrapper
         GameObject CreatePrimitive(PrimitiveType primitiveType);
         //TODO: This is not testable - create GameObejctWrappers
-        Object Instantiate(GameObject original);
+        Object Instantiate(Object original);
 
         Object Load(string path, Type objectType);
         T Load<T>(string path) where T : Object;
